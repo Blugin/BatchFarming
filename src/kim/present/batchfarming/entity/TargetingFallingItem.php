@@ -1,7 +1,7 @@
 <?php /** @noinspection PhpInternalEntityUsedInspection */
 declare(strict_types=1);
 
-namespace kim\present\showysowing\entity;
+namespace kim\present\batchfarming\entity;
 
 use pocketmine\block\Block;
 use pocketmine\entity\Location;

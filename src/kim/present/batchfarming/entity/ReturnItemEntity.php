@@ -1,7 +1,7 @@
 <?php /** @noinspection PhpInternalEntityUsedInspection */
 declare(strict_types=1);
 
-namespace kim\present\showysowing\entity;
+namespace kim\present\batchfarming\entity;
 
 use pocketmine\entity\object\ItemEntity;
 use pocketmine\event\inventory\InventoryPickupItemEvent;

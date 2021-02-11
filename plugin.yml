@@ -1,8 +1,8 @@
 ---
-name: ShowySowing
-main: kim\present\showysowing\Loader
+name: BatchFarming
+main: kim\present\batchfarming\Loader
 version: 1.0.0
 api: [ 4.0.0 ]
 author: PresentKim
-description: Sowing multiple at once!
+description: Quick and convenient farming with batch operation!
 ...

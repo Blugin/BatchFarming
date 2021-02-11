@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace kim\present\showysowing;
+namespace kim\present\batchfarming;
 
-use kim\present\showysowing\entity\TargetingFallingBlock;
-use kim\present\showysowing\entity\TargetingFallingItem;
-use kim\present\showysowing\event\UseBatchFarmingEvent;
+use kim\present\batchfarming\entity\TargetingFallingBlock;
+use kim\present\batchfarming\entity\TargetingFallingItem;
+use kim\present\batchfarming\event\UseBatchFarmingEvent;
 use pocketmine\block\Crops;
 use pocketmine\entity\Location;
 use pocketmine\event\Listener;
