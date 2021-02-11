@@ -9,7 +9,7 @@ use pocketmine\event\Event;
 use pocketmine\item\Item;
 use pocketmine\player\Player;
 
-final class UseBatchFarmingEvent extends Event implements Cancellable{
+final class BatchFarmingStartEvent extends Event implements Cancellable{
     use CancellableTrait;
 
     private Player $player;

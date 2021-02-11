@@ -5,7 +5,7 @@ namespace kim\present\batchfarming;
 
 use kim\present\batchfarming\entity\TargetingFallingBlock;
 use kim\present\batchfarming\entity\TargetingFallingItem;
-use kim\present\batchfarming\event\UseBatchFarmingEvent;
+use kim\present\batchfarming\event\BatchFarmingStartEvent;
 use pocketmine\block\Crops;
 use pocketmine\entity\Location;
 use pocketmine\event\Listener;
@@ -51,7 +51,7 @@ final class Loader extends PluginBase implements Listener{
         $world = $player->getWorld();
         $pos = $event->getBlock()->getPos()->add(0.5, 1, 0.5);
 
-        $ev = new UseBatchFarmingEvent($player, $item, $this->maxStep, $this->risePerStep, $this->clockwise);
+        $ev = new BatchFarmingStartEvent($player, $item, $this->maxStep, $this->risePerStep, $this->clockwise);
         $ev->call();
         if($ev->isCancelled())
             return;
