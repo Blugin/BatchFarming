@@ -1,0 +1,12 @@
+# Main configuration file for ShowySowing
+# Some of these settings are safe, others can break your server if modified incorrectly
+# New settings/defaults won't appear automatically in this file when upgrading.
+
+# Maximum step count of block placing at once [int] (default: 32)
+max-step: 32
+
+# The amount of height increasing in each step [float] (default: 0.4)
+rise-per-step: 0.4
+
+# Whether to rotate clockwise [boolean] (default: true)
+clockwise: true
