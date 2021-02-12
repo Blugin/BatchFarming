@@ -1,7 +1,7 @@
 ---
 name: ShowySowing
 main: kim\present\showysowing\Loader
-version: 0.1.0
+version: 1.0.0
 api: [ 4.0.0 ]
 author: PresentKim
 description: Sowing multiple at once!
