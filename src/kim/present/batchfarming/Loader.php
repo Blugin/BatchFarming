@@ -60,7 +60,15 @@ final class Loader extends PluginBase implements Listener{
         $direction = $baseDirection;
         $add = new Vector3(0, 0, 0);
         $range = 1;
-        for($step = 0; $step < $ev->getMaxStep() && !$item->isNull(); ++$step, $item->pop()){
+        $hasFiniteResources = $player->hasFiniteResources();
+        for($step = 0; $step < $ev->getMaxStep(); ++$step){
+            if($hasFiniteResources){
+                if($item->isNull()){
+                    break;
+                }else{
+                    $item->pop();
+                }
+            }
             $location = Location::fromObject($pos->add($add->x, $step * $ev->getRisePerStep(), $add->z), $world);
             if($item instanceof Fertilizer){
                 $entity = new TargetingFallingItem($location, $player, $item, (int) $pos->y);
@@ -82,7 +90,7 @@ final class Loader extends PluginBase implements Listener{
                 $add = $add->getSide($direction);
             }
         }
-        if($player->hasFiniteResources()){
+        if($hasFiniteResources){
             $player->getInventory()->setItemInHand($item);
         }
     }
