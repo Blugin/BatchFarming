@@ -29,15 +29,13 @@ declare(strict_types=1);
 
 namespace kim\present\batchfarming;
 
-use kim\present\batchfarming\entity\TargetingFallingBlock;
-use kim\present\batchfarming\entity\TargetingFallingItem;
 use kim\present\batchfarming\event\BatchFarmingStartEvent;
+use kim\present\batchfarming\task\SeedingTask;
 use kim\present\traits\multilingualresource\MultilingualConfigTrait;
 use pocketmine\block\Crops;
 use pocketmine\entity\Location;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerInteractEvent;
-use pocketmine\item\Fertilizer;
 use pocketmine\math\Facing;
 use pocketmine\math\Vector3;
 use pocketmine\plugin\PluginBase;
@@ -72,12 +70,12 @@ final class Loader extends PluginBase implements Listener{
             return;
 
         $player = $event->getPlayer();
-        if(!$player->isSneaking() || TargetingFallingBlock::getCount($player) > 0)
+        if(!$player->isSneaking() || SeedingTask::getCount($player) > 0)
             return;
 
         $item = $event->getItem();
         $block = $item->getBlock();
-        if(!$item instanceof Fertilizer && !$block instanceof Crops)
+        if(!$block instanceof Crops)
             return;
 
         $event->cancel();
@@ -103,14 +101,7 @@ final class Loader extends PluginBase implements Listener{
                 }
             }
             $location = Location::fromObject($pos->add($add->x, $step * $ev->getRisePerStep(), $add->z), $world);
-            if($item instanceof Fertilizer){
-                $entity = new TargetingFallingItem($location, $player, $item, (int) $pos->y);
-            }elseif($block instanceof Crops){
-                $entity = new TargetingFallingBlock($location, $player, $block, (int) $pos->y);
-            }else{
-                return;
-            }
-            $entity->spawnToAll();
+            $this->getScheduler()->scheduleRepeatingTask(new SeedingTask($player, $location, $block, (int) $pos->y), 1);
 
             $next = $add->getSide($direction);
             if(abs($next->x) <= $range && abs($next->z) <= $range){
