@@ -5,4 +5,7 @@ projects:
   BatchFarming:
     lint:
       phpstan: false
+    libs:
+      - src: PresentKim/multilingual-resource-trait/multilingual-resource-trait
+        version: ^1.0.0
 ...

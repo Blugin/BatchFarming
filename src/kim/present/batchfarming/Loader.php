@@ -32,6 +32,7 @@ namespace kim\present\batchfarming;
 use kim\present\batchfarming\entity\TargetingFallingBlock;
 use kim\present\batchfarming\entity\TargetingFallingItem;
 use kim\present\batchfarming\event\BatchFarmingStartEvent;
+use kim\present\traits\multilingualresource\MultilingualConfigTrait;
 use pocketmine\block\Crops;
 use pocketmine\entity\Location;
 use pocketmine\event\Listener;
@@ -46,6 +47,8 @@ use function is_bool;
 use function strtolower;
 
 final class Loader extends PluginBase implements Listener{
+    use MultilingualConfigTrait;
+
     private int $maxStep;
     private float $risePerStep;
     private bool $clockwise;
