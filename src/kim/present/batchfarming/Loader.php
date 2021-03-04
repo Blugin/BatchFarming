@@ -30,10 +30,10 @@ declare(strict_types=1);
 namespace kim\present\batchfarming;
 
 use kim\present\batchfarming\event\BatchFarmingStartEvent;
+use kim\present\batchfarming\object\SeedObject;
 use kim\present\batchfarming\task\SeedingTask;
 use kim\present\traits\multilingualresource\MultilingualConfigTrait;
 use pocketmine\block\Crops;
-use pocketmine\entity\Location;
 use pocketmine\event\Listener;
 use pocketmine\event\player\PlayerInteractEvent;
 use pocketmine\math\Facing;
@@ -92,6 +92,7 @@ final class Loader extends PluginBase implements Listener{
         $add = new Vector3(0, 0, 0);
         $range = 1;
         $hasFiniteResources = $player->hasFiniteResources();
+        $seeds = [];
         for($step = 0; $step < $ev->getMaxStep(); ++$step){
             if($hasFiniteResources){
                 if($item->isNull()){
@@ -100,8 +101,7 @@ final class Loader extends PluginBase implements Listener{
                     $item->pop();
                 }
             }
-            $location = Location::fromObject($pos->add($add->x, $step * $ev->getRisePerStep(), $add->z), $world);
-            $this->getScheduler()->scheduleRepeatingTask(new SeedingTask($player, $location, $block, (int) $pos->y), 1);
+            $seeds[] = new SeedObject($pos->add($add->x, $step * $ev->getRisePerStep(), $add->z), $block);
 
             $next = $add->getSide($direction);
             if(abs($next->x) <= $range && abs($next->z) <= $range){
@@ -114,9 +114,8 @@ final class Loader extends PluginBase implements Listener{
                 $add = $add->getSide($direction);
             }
         }
-        if($hasFiniteResources){
-            $player->getInventory()->setItemInHand($item);
-        }
+        $player->getInventory()->setItemInHand($item);
+        $this->getScheduler()->scheduleRepeatingTask(new SeedingTask($player, (int) $pos->y, $world, $seeds), 1);
     }
 
     private function getConfigFloat(string $k, float $default) : float{

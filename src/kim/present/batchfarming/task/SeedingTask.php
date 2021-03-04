@@ -23,7 +23,6 @@
  * @noinspection PhpIllegalPsrClassPathInspection
  * @noinspection PhpDocSignatureInspection
  * @noinspection SpellCheckingInspection
- * @noinspection PhpInternalEntityUsedInspection
  * @noinspection PhpDeprecationInspection
  */
 
@@ -31,24 +30,16 @@ declare(strict_types=1);
 
 namespace kim\present\batchfarming\task;
 
-use pocketmine\block\Block;
-use pocketmine\entity\Entity;
-use pocketmine\entity\Location;
-use pocketmine\event\block\BlockPlaceEvent;
-use pocketmine\math\Facing;
-use pocketmine\math\Vector3;
-use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
-use pocketmine\network\mcpe\protocol\AddActorPacket;
-use pocketmine\network\mcpe\protocol\MoveActorAbsolutePacket;
-use pocketmine\network\mcpe\protocol\RemoveActorPacket;
-use pocketmine\network\mcpe\protocol\types\entity\EntityIds;
-use pocketmine\network\mcpe\protocol\types\entity\EntityMetadataProperties;
-use pocketmine\network\mcpe\protocol\types\entity\IntMetadataProperty;
+use kim\present\batchfarming\object\SeedObject;
+use pocketmine\network\mcpe\protocol\ClientboundPacket;
 use pocketmine\player\Player;
 use pocketmine\scheduler\Task;
 use pocketmine\Server;
-use pocketmine\world\sound\BlockPlaceSound;
+use pocketmine\world\World;
 
+use function array_map;
+use function array_values;
+use function count;
 use function spl_object_hash;
 
 final class SeedingTask extends Task{
@@ -65,23 +56,22 @@ final class SeedingTask extends Task{
     }
 
     private Player $owningPlayer;
-    private Location $location;
-    private Block $block;
     private int $targetY;
+    private World $world;
+    /** @var SeedObject[] */
+    private array $seeds;
 
     /** @var Player[] */
     private array $hasSpawned = [];
-    private int $entityRuntimeId;
     private bool $giveItemOnCancel;
-    private float $motionY = 0.0;
 
-    public function __construct(Player $owningPlayer, Location $location, Block $block, int $targetY){
+    /** @param SeedObject[] $seeds */
+    public function __construct(Player $owningPlayer, int $targetY, World $world, array $seeds){
         $this->owningPlayer = $owningPlayer;
-        $this->location = $location;
-        $this->block = $block;
         $this->targetY = $targetY;
+        $this->world = $world;
+        $this->seeds = $seeds;
 
-        $this->entityRuntimeId = Entity::nextRuntimeId();
         $this->giveItemOnCancel = $owningPlayer->hasFiniteResources();
 
         if(!isset(self::$counts[$hash = spl_object_hash($owningPlayer)])){
@@ -89,6 +79,14 @@ final class SeedingTask extends Task{
         }
         self::$counts[$hash]++;
 
+        $chunkX = $owningPlayer->getPosition()->getFloorX() >> 4;
+        $chunkZ = $owningPlayer->getPosition()->getFloorZ() >> 4;
+        foreach($this->world->getChunkPlayers($chunkX, $chunkZ) as $player){
+            if(!$player->hasReceivedChunk($chunkX, $chunkZ))
+                continue;
+
+            $this->hasSpawned[spl_object_hash($player)] = $player;
+        }
         $this->broadcastEntitySpawn();
     }
 
@@ -98,19 +96,32 @@ final class SeedingTask extends Task{
             return;
         }
 
-        $world = $this->location->getWorld();
-        if($world->getBlock($this->location)->isSolid()){
-            if($this->placeBlock($this->location)){
-                $this->giveItemOnCancel = false;
+        $count = count($this->seeds);
+        for($i = 0; $i < $count; ++$i){
+            $seed = $this->seeds[$i];
+
+            if($this->world->getBlock($seed)->isSolid()){
+                if($seed->place($this->world, $this->owningPlayer)){
+                    $this->giveItemOnCancel = false;
+                }elseif($this->giveItemOnCancel){
+                    $seed->collect($this->world, $this->owningPlayer);
+                }
+                $this->broadcastEntityDespawn($seed);
+                unset($this->seeds[$i]);
+                continue;
             }
+            if($seed->motionY > -0.9){
+                $seed->motionY -= 0.04;
+            }
+            $seed->y += $seed->motionY;
+        }
+
+        $this->seeds = array_values($this->seeds);
+        if(empty($this->seeds)){
             $this->getHandler()->cancel();
-            return;
+        }else{
+            $this->broadcastEntityMove();
         }
-        if($this->motionY > -0.9){
-            $this->motionY -= 0.04;
-        }
-        $this->location->y += $this->motionY;
-        $this->broadcastEntityMove();
     }
 
     public function onCancel() : void{
@@ -119,88 +130,27 @@ final class SeedingTask extends Task{
             unset(self::$counts[$hash]);
         }
 
-        $this->broadcastEntityDespawn();
-        if($this->giveItemOnCancel){
-            $item = $this->block->getPickedItem();
-            if(
-                $this->owningPlayer->isClosed() ||
-                !$this->owningPlayer->isConnected() ||
-                !empty($this->owningPlayer->getInventory()->addItem($item))
-            ){
-                $this->location->getWorld()->dropItem($this->location->add(0, 0.5, 0), $item);
+        foreach($this->seeds as $seed){
+            $this->broadcastEntityDespawn($seed);
+            if($this->giveItemOnCancel){
+                $seed->collect($this->world, $this->owningPlayer);
             }
         }
     }
 
     private function broadcastEntitySpawn() : void{
-        $pk = new AddActorPacket();
-        $pk->entityRuntimeId = $this->entityRuntimeId;
-        $pk->position = $this->location->asVector3();
-        $pk->yaw = $pk->headYaw = $this->location->yaw;
-        $pk->pitch = $this->location->pitch;
-        $pk->type = EntityIds::FALLING_BLOCK;
-        $pk->metadata = [
-            EntityMetadataProperties::VARIANT => new IntMetadataProperty(RuntimeBlockMapping::getInstance()->toRuntimeId($this->block->getFullId())),
-        ];
-
-        $chunkX = $this->location->getFloorX() >> 4;
-        $chunkZ = $this->location->getFloorZ() >> 4;
-        foreach($this->location->getWorld()->getChunkPlayers($chunkX, $chunkZ) as $player){
-            if(!$player->hasReceivedChunk($chunkX, $chunkZ))
-                continue;
-
-            $this->hasSpawned[spl_object_hash($player)] = $player;
-            $player->getNetworkSession()->sendDataPacket($pk);
-        }
-    }
-
-    private function broadcastEntityDespawn() : void{
-        $pk = RemoveActorPacket::create($this->entityRuntimeId);
-
-        foreach($this->hasSpawned as $player){
-            if(!$player->isConnected())
-                continue;
-
-            unset($this->hasSpawned[spl_object_hash($player)]);
-            $player->getNetworkSession()->sendDataPacket($pk);
+        if(!empty($this->seeds)){
+            Server::getInstance()->broadcastPackets($this->hasSpawned, array_map(fn(SeedObject $seed) : ClientboundPacket => $seed->getSpawnPacket(), $this->seeds));
         }
     }
 
     private function broadcastEntityMove() : void{
-        Server::getInstance()->broadcastPackets($this->hasSpawned, [
-            MoveActorAbsolutePacket::create(
-                $this->entityRuntimeId,
-                $this->location->add(0, 0.5, 0),
-                $this->location->pitch,
-                $this->location->yaw,
-                $this->location->yaw
-            )
-        ]);
+        if(!empty($this->seeds)){
+            Server::getInstance()->broadcastPackets($this->hasSpawned, array_map(fn(SeedObject $seed) : ClientboundPacket => $seed->getMovementPacket(), $this->seeds));
+        }
     }
 
-    /** @return bool Whether block placement is successful */
-    protected function placeBlock(Location $pos) : bool{
-        $world = $pos->getWorld();
-        $clicked = $pos->floor();
-        $replace = $clicked->add(0, 1, 0);
-        $blockReplace = $world->getBlock($replace);
-        if(
-            !$world->isInWorld($replace->x, $replace->y, $replace->z) ||
-            !$world->isChunkLoaded($chunkX = $replace->getFloorX() >> 4, $chunkZ = $replace->getFloorZ() >> 4) ||
-            !$world->isChunkGenerated($chunkX, $chunkZ) ||
-            $world->isChunkLocked($chunkX, $chunkZ) ||
-            !$this->block->canBePlacedAt($blockReplace, new Vector3(0.5, 0, 0.5), Facing::UP, false)
-        ){
-            return false;
-        }
-
-        $ev = new BlockPlaceEvent($this->owningPlayer, $this->block, $blockReplace, $world->getBlock($clicked), $this->block->getPickedItem());
-        $ev->call();
-        if($ev->isCancelled())
-            return false;
-
-        $world->setBlockAt($replace->x, $replace->y, $replace->z, $this->block);
-        $world->addSound($this->location, new BlockPlaceSound($this->block));
-        return true;
+    private function broadcastEntityDespawn(SeedObject $seed) : void{
+        Server::getInstance()->broadcastPackets($this->hasSpawned, [$seed->getDespawnPacket()]);
     }
 }
