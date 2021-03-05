@@ -31,18 +31,18 @@ declare(strict_types=1);
 namespace kim\present\batchfarming\task;
 
 use kim\present\batchfarming\object\SeedObject;
-use pocketmine\network\mcpe\protocol\ClientboundPacket;
 use pocketmine\player\Player;
+use pocketmine\plugin\PluginBase;
+use pocketmine\plugin\PluginOwnedTrait;
 use pocketmine\scheduler\Task;
 use pocketmine\Server;
 use pocketmine\world\World;
 
-use function array_map;
-use function array_values;
-use function count;
 use function spl_object_hash;
 
 final class SeedingTask extends Task{
+    use PluginOwnedTrait;
+
     /**
      * Counts of tasks launched by the each player
      * It is used to disable continuous use when a function is already in use.
@@ -59,20 +59,20 @@ final class SeedingTask extends Task{
     private int $targetY;
     private World $world;
     /** @var SeedObject[] */
-    private array $seeds;
+    private array $seeds = [];
 
     /** @var Player[] */
     private array $hasSpawned = [];
-    private bool $giveItemOnCancel;
 
     /** @param SeedObject[] $seeds */
-    public function __construct(Player $owningPlayer, int $targetY, World $world, array $seeds){
+    public function __construct(PluginBase $owningPlugin, Player $owningPlayer, int $targetY, World $world, array $seeds){
+        $this->owningPlugin = $owningPlugin;
         $this->owningPlayer = $owningPlayer;
         $this->targetY = $targetY;
         $this->world = $world;
-        $this->seeds = $seeds;
-
-        $this->giveItemOnCancel = $owningPlayer->hasFiniteResources();
+        foreach($seeds as $seed){
+            $this->seeds[spl_object_hash($seed)] = $seed;
+        }
 
         if(!isset(self::$counts[$hash = spl_object_hash($owningPlayer)])){
             self::$counts[$hash] = 0;
@@ -96,26 +96,17 @@ final class SeedingTask extends Task{
             return;
         }
 
-        $count = count($this->seeds);
-        for($i = 0; $i < $count; ++$i){
-            $seed = $this->seeds[$i];
+        foreach($this->seeds as $seed){
             if($seed->y < 0){
-                if($this->giveItemOnCancel){
-                    $seed->collect($this->world, $this->owningPlayer);
-                }
-                $this->broadcastEntityDespawn($seed);
-                unset($this->seeds[$i]);
+                $this->collectSeed($seed, false);
                 continue;
             }
             if($seed->lastY !== $seed->getFloorY() && $this->world->getBlock($seed)->isSolid()){
                 $seed->lastY = $seed->getFloorY();
-                if($seed->place($this->world, $this->owningPlayer)){
-                    $this->giveItemOnCancel = false;
-                }elseif($this->giveItemOnCancel){
-                    $seed->collect($this->world, $this->owningPlayer);
+                if($placed = $seed->place($this->world, $this->owningPlayer)){
+                    $seed->giveItemOnCollect = false;
                 }
-                $this->broadcastEntityDespawn($seed);
-                unset($this->seeds[$i]);
+                $this->collectSeed($seed, !$placed);
                 continue;
             }
             if($seed->motionY > -0.9){
@@ -124,7 +115,6 @@ final class SeedingTask extends Task{
             $seed->y += $seed->motionY;
         }
 
-        $this->seeds = array_values($this->seeds);
         if(empty($this->seeds)){
             $this->getHandler()->cancel();
         }else{
@@ -139,26 +129,39 @@ final class SeedingTask extends Task{
         }
 
         foreach($this->seeds as $seed){
-            $this->broadcastEntityDespawn($seed);
-            if($this->giveItemOnCancel){
-                $seed->collect($this->world, $this->owningPlayer);
-            }
+            $this->collectSeed($seed, true);
         }
     }
 
     private function broadcastEntitySpawn() : void{
-        if(!empty($this->seeds)){
-            Server::getInstance()->broadcastPackets($this->hasSpawned, array_map(fn(SeedObject $seed) : ClientboundPacket => $seed->getSpawnPacket(), $this->seeds));
+        $packets = [];
+        foreach($this->seeds as $seed){
+            $packets[] = $seed->getSpawnPacket();
+        }
+
+        if(!empty($packets)){
+            Server::getInstance()->broadcastPackets($this->hasSpawned, $packets);
         }
     }
 
     private function broadcastEntityMove() : void{
-        if(!empty($this->seeds)){
-            Server::getInstance()->broadcastPackets($this->hasSpawned, array_map(fn(SeedObject $seed) : ClientboundPacket => $seed->getMovementPacket(), $this->seeds));
+        $packets = [];
+        foreach($this->seeds as $seed){
+            $packets[] = $seed->getMovementPacket();
+        }
+
+        if(!empty($packets)){
+            Server::getInstance()->broadcastPackets($this->hasSpawned, $packets);
         }
     }
 
-    private function broadcastEntityDespawn(SeedObject $seed) : void{
-        Server::getInstance()->broadcastPackets($this->hasSpawned, [$seed->getDespawnPacket()]);
+    private function collectSeed(SeedObject $seed, bool $showItem) : void{
+        unset($this->seeds[spl_object_hash($seed)]);
+        if($showItem){
+            $this->owningPlugin->getScheduler()->scheduleDelayedTask(new CollectTask($this->owningPlayer, $this->world, $seed), 10);
+        }else{
+            $seed->collect($this->world, $this->owningPlayer);
+            Server::getInstance()->broadcastPackets($this->hasSpawned, [$seed->getDespawnPacket()]);
+        }
     }
 }

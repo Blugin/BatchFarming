@@ -101,7 +101,7 @@ final class Loader extends PluginBase implements Listener{
                     $item->pop();
                 }
             }
-            $seeds[] = new SeedObject($pos->add($add->x, $step * $ev->getRisePerStep(), $add->z), $block);
+            $seeds[] = new SeedObject($pos->add($add->x, $step * $ev->getRisePerStep(), $add->z), $block, $hasFiniteResources);
 
             $next = $add->getSide($direction);
             if(abs($next->x) <= $range && abs($next->z) <= $range){
@@ -115,7 +115,7 @@ final class Loader extends PluginBase implements Listener{
             }
         }
         $player->getInventory()->setItemInHand($item);
-        $this->getScheduler()->scheduleRepeatingTask(new SeedingTask($player, (int) $pos->y, $world, $seeds), 1);
+        $this->getScheduler()->scheduleRepeatingTask(new SeedingTask($this, $player, (int) $pos->y, $world, $seeds), 1);
     }
 
     private function getConfigFloat(string $k, float $default) : float{

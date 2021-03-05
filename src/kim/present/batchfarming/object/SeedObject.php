@@ -49,12 +49,14 @@ use pocketmine\world\World;
 final class SeedObject extends Vector3{
     public Block $block;
     public int $entityRuntimeId;
+    public bool $giveItemOnCollect;
     public float $motionY = 0.0;
     public float $lastY = PHP_INT_MAX;
 
-    public function __construct(Vector3 $parent, Block $block){
+    public function __construct(Vector3 $parent, Block $block, bool $giveItemOnCollect){
         parent::__construct($parent->x, $parent->y, $parent->z);
         $this->block = $block;
+        $this->giveItemOnCollect = $giveItemOnCollect;
         $this->entityRuntimeId = Entity::nextRuntimeId();
     }
 
@@ -103,6 +105,9 @@ final class SeedObject extends Vector3{
     }
 
     public function collect(World $world, Player $player) : void{
+        if(!$this->giveItemOnCollect)
+            return;
+
         $item = $this->block->getPickedItem();
         if(
             $player->isClosed() ||
