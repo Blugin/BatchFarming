@@ -99,7 +99,14 @@ final class SeedingTask extends Task{
         $count = count($this->seeds);
         for($i = 0; $i < $count; ++$i){
             $seed = $this->seeds[$i];
-
+            if($seed->y < 0){
+                if($this->giveItemOnCancel){
+                    $seed->collect($this->world, $this->owningPlayer);
+                }
+                $this->broadcastEntityDespawn($seed);
+                unset($this->seeds[$i]);
+                continue;
+            }
             if($this->world->getBlock($seed)->isSolid()){
                 if($seed->place($this->world, $this->owningPlayer)){
                     $this->giveItemOnCancel = false;
