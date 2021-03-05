@@ -107,7 +107,8 @@ final class SeedingTask extends Task{
                 unset($this->seeds[$i]);
                 continue;
             }
-            if($this->world->getBlock($seed)->isSolid()){
+            if($seed->lastY !== $seed->getFloorY() && $this->world->getBlock($seed)->isSolid()){
+                $seed->lastY = $seed->getFloorY();
                 if($seed->place($this->world, $this->owningPlayer)){
                     $this->giveItemOnCancel = false;
                 }elseif($this->giveItemOnCancel){

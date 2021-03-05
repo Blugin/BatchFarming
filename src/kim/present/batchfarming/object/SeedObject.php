@@ -50,6 +50,7 @@ final class SeedObject extends Vector3{
     public Block $block;
     public int $entityRuntimeId;
     public float $motionY = 0.0;
+    public float $lastY = PHP_INT_MAX;
 
     public function __construct(Vector3 $parent, Block $block){
         parent::__construct($parent->x, $parent->y, $parent->z);
