@@ -2,6 +2,9 @@
 # Some of these settings are safe, others can break your server if modified incorrectly
 # New settings/defaults won't appear automatically in this file when upgrading.
 
+# Max counts of run at the same time [int] (default: 3)
+max-count: 3
+
 # Maximum step count of block placing at once [int] (default: 9)
 max-step: 9
 

@@ -47,13 +47,15 @@ use function strtolower;
 final class Loader extends PluginBase implements Listener{
     use MultilingualConfigTrait;
 
+    private int $maxCount;
     private int $maxStep;
     private float $risePerStep;
     private bool $clockwise;
 
     protected function onEnable() : void{
-        $this->maxStep = (int) $this->getConfigFloat("max-step", 32);
-        $this->risePerStep = $this->getConfigFloat("rise-per-step", 32);
+        $this->maxCount = (int) $this->getConfigFloat("max-count", 3);
+        $this->maxStep = (int) $this->getConfigFloat("max-step", 9);
+        $this->risePerStep = $this->getConfigFloat("rise-per-step", 0.4);
         $this->clockwise = $this->getConfigBool("clockwise", true);
         $this->getServer()->getPluginManager()->registerEvents($this, $this);
     }
@@ -70,7 +72,7 @@ final class Loader extends PluginBase implements Listener{
             return;
 
         $player = $event->getPlayer();
-        if(!$player->isSneaking() || SeedingTask::getCount($player) > 0)
+        if(!$player->isSneaking() || SeedingTask::getCount($player) >= $this->maxCount)
             return;
 
         $item = $event->getItem();
